@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+venv/
+.env
+
+# Build files
+dist/
+build/
+*.pyc
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db

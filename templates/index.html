@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Add Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Add icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-['Inter']">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header with gradient and shadow -->
+        <div class="bg-white bg-opacity-90 backdrop-blur-lg rounded-2xl shadow-lg p-6 mb-8">
+            <h1 class="text-4xl font-bold text-center bg-gradient-to-r from-blue-600 to-purple-600 text-transparent bg-clip-text">
+                Gemini Chat
+            </h1>
+            <p class="text-center text-gray-500 mt-2">Powered by Google's AI</p>
+        </div>
+        
+        <!-- Chat container with improved styling -->
+        <div id="chat-container" class="bg-white rounded-2xl shadow-lg p-6 mb-6 h-[600px] overflow-y-auto scroll-smooth">
+            <div class="space-y-6">
+                <!-- Welcome message -->
+                <div class="flex items-center space-x-3 mb-8">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                        <i class="fas fa-robot text-white"></i>
+                    </div>
+                    <div class="bg-gray-100 rounded-2xl rounded-tl-none p-4 max-w-[80%]">
+                        <p class="text-gray-800">Hello! How can I assist you today?</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input form with enhanced design -->
+        <form id="chat-form" class="flex gap-3 bg-white p-4 rounded-2xl shadow-lg">
+            <input 
+                type="text" 
+                id="user-input" 
+                class="flex-1 p-4 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-gray-700"
+                placeholder="Type your message..."
+                required
+            >
+            <button 
+                type="submit"
+                class="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-4 rounded-xl hover:opacity-90 transition-all duration-200 flex items-center gap-2 font-medium"
+            >
+                <span>Send</span>
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </form>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+
+        function addMessage(content, isUser = false, isLoading = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex items-center space-x-3 mb-6 ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'w-10 h-10 rounded-full flex items-center justify-center';
+            
+            if (isUser) {
+                avatar.className += ' bg-gradient-to-r from-blue-500 to-blue-600';
+                avatar.innerHTML = '<i class="fas fa-user text-white"></i>';
+            } else {
+                avatar.className += ' bg-gradient-to-r from-purple-500 to-purple-600';
+                avatar.innerHTML = '<i class="fas fa-robot text-white"></i>';
+            }
+
+            const messageBubble = document.createElement('div');
+            messageBubble.className = `p-4 max-w-[80%] ${
+                isUser 
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl rounded-tr-none' 
+                    : 'bg-gray-100 rounded-2xl rounded-tl-none'
+            }`;
+
+            if (isLoading) {
+                messageBubble.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                    </div>
+                `;
+            } else {
+                messageBubble.textContent = content;
+            }
+            
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageBubble);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return { messageDiv, messageBubble };
+        }
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            // Add user message to chat
+            addMessage(message, true);
+            userInput.value = '';
+
+            // Add AI message container
+            const { messageDiv, messageBubble } = addMessage('', false);
+            let responseText = '';
+
+            try {
+                // Create EventSource for streaming response
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            responseText += data;
+                            messageBubble.textContent = responseText;
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        }
+                    }
+                }
+
+            } catch (error) {
+                messageBubble.textContent = 'Sorry, something went wrong. Please try again.';
+            }
+        });
+    </script>
+</body>
+</html>
